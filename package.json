@@ -9,6 +9,7 @@
     "lint": "eslint",
     "worker": "tsx src/workers/priceFeedWorker.ts",
     "worker:dev": "tsx watch src/workers/priceFeedWorker.ts",
+    "daily-chapter": "tsx src/workers/dailyChapterWorker.ts",
     "test": "vitest run"
   },
   "dependencies": {

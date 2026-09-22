@@ -10,4 +10,6 @@ export const REFERENCE_PRICES: Record<string, number> = {
   BHARTIARTL: 1650,
   ITC: 460,
   KOTAKBANK: 1780,
+  NIFTY: 24800,
+  BANKNIFTY: 52400,
 };

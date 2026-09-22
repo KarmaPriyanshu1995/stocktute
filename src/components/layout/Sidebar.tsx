@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { auth } from "@/auth";
 
 const NAV = [
   {
@@ -30,7 +31,10 @@ const NAV = [
   },
 ] as const;
 
-export function Sidebar() {
+export async function Sidebar() {
+  const session = await auth();
+  const isAdmin = session?.user?.role === "admin";
+
   return (
     <aside className="hidden w-56 shrink-0 border-r border-bg-border bg-bg-raised px-3 py-6 md:block">
       <Link href="/dashboard" className="mb-8 block px-2 font-display text-2xl tracking-tight text-text-primary">
@@ -52,6 +56,14 @@ export function Sidebar() {
                   {item.label}
                 </Link>
               ))}
+              {group.label === "Account" && isAdmin ? (
+                <Link
+                  href="/admin"
+                  className="rounded-md px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-bg-surface-hover hover:text-text-primary"
+                >
+                  Admin
+                </Link>
+              ) : null}
             </div>
           </div>
         ))}
