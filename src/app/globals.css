@@ -1,0 +1,105 @@
+@import "tailwindcss";
+
+/* ---- Design tokens (dark by default) ---- */
+:root {
+  --color-bg-base: #0b0e11;
+  --color-bg-raised: #12161b;
+  --color-bg-surface: #171c22;
+  --color-bg-surface-hover: #1d232b;
+  --color-bg-border: #242b33;
+  --color-bg-border-strong: #333c46;
+
+  --color-accent: #c6ff3d;
+  --color-accent-dim: #9fcc30;
+  --color-accent-glow: rgba(198, 255, 61, 0.25);
+
+  --color-price-up: #3ddc84;
+  --color-price-up-dim: #245c3c;
+  --color-price-down: #ff5c5c;
+  --color-price-down-dim: #5c2a2a;
+  --color-price-flat: #8a9099;
+
+  --color-text-primary: #f4f1ea;
+  --color-text-secondary: #9da3ac;
+  --color-text-tertiary: #6b7178;
+  --color-text-inverse: #0b0e11;
+}
+
+:root[data-theme="light"] {
+  --color-bg-base: #f5f4ef;
+  --color-bg-raised: #ffffff;
+  --color-bg-surface: #fbfaf6;
+  --color-bg-surface-hover: #efeee7;
+  --color-bg-border: #dedcd2;
+  --color-bg-border-strong: #c7c4b6;
+
+  --color-text-primary: #14171b;
+  --color-text-secondary: #565b62;
+  --color-text-tertiary: #84898f;
+  --color-text-inverse: #f5f4ef;
+}
+
+@theme inline {
+  --color-bg-base: var(--color-bg-base);
+  --color-bg-raised: var(--color-bg-raised);
+  --color-bg-surface: var(--color-bg-surface);
+  --color-bg-surface-hover: var(--color-bg-surface-hover);
+  --color-bg-border: var(--color-bg-border);
+  --color-bg-border-strong: var(--color-bg-border-strong);
+
+  --color-accent: var(--color-accent);
+  --color-accent-dim: var(--color-accent-dim);
+
+  --color-price-up: var(--color-price-up);
+  --color-price-up-dim: var(--color-price-up-dim);
+  --color-price-down: var(--color-price-down);
+  --color-price-down-dim: var(--color-price-down-dim);
+  --color-price-flat: var(--color-price-flat);
+
+  --color-text-primary: var(--color-text-primary);
+  --color-text-secondary: var(--color-text-secondary);
+  --color-text-tertiary: var(--color-text-tertiary);
+  --color-text-inverse: var(--color-text-inverse);
+
+  --font-display: var(--font-display);
+  --font-ui: var(--font-ui);
+  --font-mono: var(--font-mono);
+}
+
+body {
+  background: var(--color-bg-base);
+  color: var(--color-text-primary);
+}
+
+@keyframes scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* Respect reduced-motion globally; individual components may still opt into
+   essential, non-decorative motion. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Subtle grain overlay, applied via a utility class rather than globally */
+.bg-grain {
+  position: relative;
+}
+.bg-grain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
