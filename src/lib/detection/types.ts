@@ -89,3 +89,6 @@ export type AnalyzeChartInput = {
 
 export const FORWARD_HORIZONS = [1, 3, 5, 10] as const;
 export const SIDEWAYS_BAND_PCT = 0.5;
+
+export const CLASSROOM_DISCLAIMER =
+  "Educational content only. Not investment advice. Past patterns do not guarantee future results.";

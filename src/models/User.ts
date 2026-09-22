@@ -26,6 +26,11 @@ const userSchema = new Schema(
       startingBalance: { type: Number, default: 500_000 },
     },
 
+    // Curriculum access and classroom vocabulary (1–12). F&O stays locked until Level 6.
+    level: { type: Number, default: 2, min: 1, max: 12 },
+    xp: { type: Number, default: 0, min: 0 },
+    language: { type: String, enum: ["en", "hi", "hinglish"], default: "en" },
+
     // Learning progress summary (denormalized for fast dashboard reads)
     progress: {
       streakDays: { type: Number, default: 0 },

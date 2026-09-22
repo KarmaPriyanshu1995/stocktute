@@ -36,6 +36,8 @@ type Props = {
   liveCandle?: Candle | null;
   markers?: ChartMarker[];
   highlightTime?: number | null;
+  /** Inclusive time range whose bodies get a brighter border (pattern candles). */
+  highlightRange?: { fromTime: number; toTime: number } | null;
   height?: number;
   className?: string;
 };
@@ -49,6 +51,7 @@ export function LightweightChart({
   liveCandle,
   markers = [],
   highlightTime = null,
+  highlightRange = null,
   height = 420,
   className,
 }: Props) {
@@ -114,9 +117,25 @@ export function LightweightChart({
   useEffect(() => {
     const series = seriesRef.current;
     if (!series || data.length === 0) return;
-    series.setData(data.map(toBar));
+    series.setData(
+      data.map((c) => {
+        const bar = toBar(c);
+        if (
+          highlightRange &&
+          c.time >= highlightRange.fromTime &&
+          c.time <= highlightRange.toTime
+        ) {
+          return {
+            ...bar,
+            borderColor: "#c6ff3d",
+            wickColor: "#c6ff3d",
+          };
+        }
+        return bar;
+      }),
+    );
     chartRef.current?.timeScale().fitContent();
-  }, [data]);
+  }, [data, highlightRange]);
 
   useEffect(() => {
     const series = seriesRef.current;
