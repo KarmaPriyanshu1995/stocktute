@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { DemoDataBadge } from "@/components/learn/DemoDataBadge";
 import { PatternReplay } from "@/components/learn/PatternReplay";
 import { mistakeNarration, scorePrediction, type HabitInsight } from "@/lib/journal/score";
 import type { DetectedSetup, ExpectedMove, Ohlcv } from "@/lib/detection/types";
+import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 export type JournalEntryView = {
@@ -16,7 +18,7 @@ export type JournalEntryView = {
   direction: ExpectedMove;
   confidence: number;
   reason: string;
-  actual: ExpectedMove;
+  actual: ExpectedMove | null;
   closeReturnPct: number | null;
   tags: string[];
   createdAt: string;
@@ -36,11 +38,11 @@ export function JournalClient({ entries, habits, dbError }: Props) {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="font-display text-3xl text-text-primary">Mistake journal</h1>
-        <p className="text-sm text-text-secondary">
-          Wrong 5-bar guesses, with the engine snapshot. Replay the next bars. Correct guesses stay
-          off this list on purpose.
-        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="font-display text-3xl text-text-primary">{t("en", "journal.title")}</h1>
+          <DemoDataBadge />
+        </div>
+        <p className="text-sm text-text-secondary">{t("en", "journal.subtitle")}</p>
       </div>
 
       {dbError && (
@@ -64,7 +66,7 @@ export function JournalClient({ entries, habits, dbError }: Props) {
       {entries.length === 0 && !dbError ? (
         <div className="rounded-lg border border-bg-border bg-bg-raised p-5">
           <p className="text-sm text-text-secondary">
-            No misses saved yet. Lock a prediction in the{" "}
+            No journal notes yet. Lock a prediction in the{" "}
             <Link href="/classroom" className="text-accent">
               AI Classroom
             </Link>{" "}
@@ -93,7 +95,7 @@ export function JournalClient({ entries, habits, dbError }: Props) {
                   </div>
                   <div className="text-sm text-text-primary">{entry.patternName}</div>
                   <div className="text-xs text-text-secondary">
-                    guessed {entry.direction} · was {entry.actual}
+                    guessed {entry.direction} · was {entry.actual ?? "unavailable"}
                   </div>
                 </button>
               </li>

@@ -1,8 +1,10 @@
 import { connectToDatabase } from "@/lib/db/mongoose";
-import { generateDailyChapter, type BuiltChapter } from "@/lib/daily/generate";
+import { chapterPublishStatus, generateDailyChapter, type BuiltChapter } from "@/lib/daily/generate";
 import { AppSettings } from "@/models/AppSettings";
 import { ComplianceEvent } from "@/models/ComplianceEvent";
 import { DailyChapter } from "@/models/DailyChapter";
+
+export { chapterPublishStatus };
 
 export async function persistGeneratedChapter(
   date: string,
@@ -25,16 +27,17 @@ export async function persistGeneratedChapter(
     return { skipped: true as const, reason: "published" as const, date };
   }
 
-  const status =
-    autoPublish && result.chapter.compliance.blockedCount === 0 ? "published" : "draft";
+  const status = chapterPublishStatus(result.chapter, autoPublish);
 
   const chapter = await DailyChapter.findOneAndUpdate(
     { date },
     {
       $set: {
         status,
+        sessionDate: result.chapter.sessionDate,
         autoPublish,
         source: result.chapter.source,
+        isSynthetic: result.chapter.isSynthetic,
         disclaimer: result.chapter.disclaimer,
         sections: result.chapter.sections,
         compliance: result.chapter.compliance,
@@ -47,14 +50,16 @@ export async function persistGeneratedChapter(
     { upsert: true, new: true },
   );
 
-  if (result.chapter.compliance.hits.length > 0) {
+  if (result.chapter.compliance.flags.length > 0) {
     await ComplianceEvent.insertMany(
-      result.chapter.compliance.hits.map((hit) => ({
+      result.chapter.compliance.flags.map((flag) => ({
         chapterDate: date,
         sectionId: "chapter",
-        phrase: hit.phrase,
-        original: hit.original,
-        rewritten: hit.rewritten,
+        phrase: flag.phrase,
+        original: flag.original,
+        suggestion: flag.suggestion,
+        rewritten: flag.suggestion,
+        resolved: false,
       })),
     );
   }
@@ -64,25 +69,38 @@ export async function persistGeneratedChapter(
 
 export function toPlain(doc: {
   date: string;
+  sessionDate?: string | null;
   status: string;
   autoPublish: boolean;
   source: string;
+  isSynthetic?: boolean;
   disclaimer: string;
   sections: BuiltChapter["sections"];
-  compliance: BuiltChapter["compliance"];
+  compliance?: {
+    blockedCount?: number;
+    flags?: BuiltChapter["compliance"]["flags"];
+    hits?: BuiltChapter["compliance"]["flags"];
+  };
   reviewNote?: string | null;
   generatedAt?: Date;
   reviewedAt?: Date | null;
   updatedAt?: Date;
 }) {
+  const flags = doc.compliance?.flags ?? doc.compliance?.hits ?? [];
   return {
     date: doc.date,
+    sessionDate: doc.sessionDate ?? doc.date,
     status: doc.status,
     autoPublish: doc.autoPublish,
     source: doc.source,
+    isSynthetic: doc.isSynthetic ?? true,
     disclaimer: doc.disclaimer,
     sections: doc.sections,
-    compliance: doc.compliance,
+    compliance: {
+      blockedCount: doc.compliance?.blockedCount ?? 0,
+      flags,
+      hits: flags,
+    },
     reviewNote: doc.reviewNote ?? "",
     generatedAt: doc.generatedAt?.toISOString() ?? null,
     reviewedAt: doc.reviewedAt?.toISOString() ?? null,

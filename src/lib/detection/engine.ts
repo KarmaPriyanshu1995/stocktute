@@ -7,7 +7,8 @@ import type {
   PatternContext,
 } from "./types";
 import type { Ohlcv } from "./types";
-import { ema, lastDefined, rsi, sma } from "./indicators";
+import { ATR_PERIOD } from "@/config/education";
+import { ema, lastDefined, rsi, sma, atr } from "./indicators";
 import { priorTrend } from "./trend";
 import { distancePct, findSupportResistance, nearest } from "./levels";
 import { detectRawPatterns } from "./patterns";
@@ -42,6 +43,7 @@ function confirmationOf(
  */
 export function analyzeChart(input: AnalyzeChartInput): ChartFacts {
   const { candles, symbol = "UNKNOWN", timeframe = "1D", baseRates } = input;
+  const isSynthetic = input.isSynthetic ?? true;
   const missingFacts: string[] = [];
 
   if (candles.length === 0) {
@@ -53,11 +55,13 @@ export function analyzeChart(input: AnalyzeChartInput): ChartFacts {
       ema20: null,
       ema50: null,
       rsi14: null,
+      atr14: null,
       volumeAvg20: null,
       supportLevels: [],
       resistanceLevels: [],
       setups: [],
       missingFacts: ["No candles provided."],
+      isSynthetic,
     };
   }
 
@@ -66,17 +70,20 @@ export function analyzeChart(input: AnalyzeChartInput): ChartFacts {
   const ema20Series = ema(closes, 20);
   const ema50Series = ema(closes, 50);
   const rsiSeries = rsi(closes, 14);
+  const atrSeries = atr(candles, ATR_PERIOD);
   const volAvgSeries = sma(volumes, 20);
 
   const last = candles.length - 1;
   const ema20 = lastDefined(ema20Series);
   const ema50 = lastDefined(ema50Series);
   const rsi14 = lastDefined(rsiSeries);
+  const atr14 = lastDefined(atrSeries);
   const volumeAvg20 = lastDefined(volAvgSeries);
 
   if (ema20 == null) missingFacts.push("EMA(20) needs 20 closed bars.");
   if (ema50 == null) missingFacts.push("EMA(50) needs 50 closed bars.");
   if (rsi14 == null) missingFacts.push("RSI(14) needs 15 closed bars.");
+  if (atr14 == null) missingFacts.push("ATR(14) needs 15 closed bars.");
   if (volumeAvg20 == null) missingFacts.push("Volume average needs 20 closed bars.");
   if (!baseRates || Object.keys(baseRates).length === 0) {
     missingFacts.push("Historical base rates were not supplied for this run.");
@@ -96,6 +103,7 @@ export function analyzeChart(input: AnalyzeChartInput): ChartFacts {
     const ema20At = ema20Series[hit.endIndex] ?? null;
     const ema50At = ema50Series[hit.endIndex] ?? null;
     const rsiAt = rsiSeries[hit.endIndex] ?? null;
+    const atrAt = atrSeries[hit.endIndex] ?? null;
     const volAvgAt = volAvgSeries[hit.endIndex] ?? null;
     const volumeVsAvg20 =
       volAvgAt && volAvgAt > 0 ? round(end.volume / volAvgAt, 4) : null;
@@ -108,6 +116,7 @@ export function analyzeChart(input: AnalyzeChartInput): ChartFacts {
       closeVsEma20: vsEma(end.close, ema20At),
       closeVsEma50: vsEma(end.close, ema50At),
       rsi14: rsiAt,
+      atr14: atrAt,
       nearestSupport: support,
       nearestResistance: resistance,
       distanceToSupportPct: distancePct(end.close, support),
@@ -143,10 +152,12 @@ export function analyzeChart(input: AnalyzeChartInput): ChartFacts {
     ema20,
     ema50,
     rsi14,
+    atr14,
     volumeAvg20,
     supportLevels: chartLevels.support,
     resistanceLevels: chartLevels.resistance,
     setups,
     missingFacts,
+    isSynthetic,
   };
 }

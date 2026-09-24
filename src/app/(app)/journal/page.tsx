@@ -25,7 +25,7 @@ export default async function JournalPage() {
       direction: row.direction as ExpectedMove,
       confidence: row.confidence,
       reason: row.reason,
-      actual: row.actual as ExpectedMove,
+      actual: (row.actual as ExpectedMove | null) ?? null,
       closeReturnPct: row.closeReturnPct ?? null,
       tags: row.tags ?? [],
       createdAt: (row.updatedAt ?? row.createdAt)?.toISOString?.() ?? new Date().toISOString(),

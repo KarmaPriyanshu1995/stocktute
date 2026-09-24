@@ -16,7 +16,8 @@ const sectionSchema = new Schema(
 
 const dailyChapterSchema = new Schema(
   {
-    date: { type: String, required: true, unique: true }, // YYYY-MM-DD IST session
+    date: { type: String, required: true, unique: true }, // YYYY-MM-DD IST run date
+    sessionDate: { type: String, index: true }, // lagged teaching session
     status: {
       type: String,
       enum: ["draft", "approved", "rejected", "published"],
@@ -25,10 +26,12 @@ const dailyChapterSchema = new Schema(
     },
     autoPublish: { type: Boolean, default: false },
     source: { type: String, enum: ["synthetic-eod", "vendor"], default: "synthetic-eod" },
+    isSynthetic: { type: Boolean, default: true },
     disclaimer: { type: String, required: true },
     sections: { type: [sectionSchema], default: [] },
     compliance: {
       blockedCount: { type: Number, default: 0 },
+      flags: { type: [Schema.Types.Mixed], default: [] },
       hits: { type: [Schema.Types.Mixed], default: [] },
     },
     skipReason: { type: String, enum: ["weekend", "holiday"] },

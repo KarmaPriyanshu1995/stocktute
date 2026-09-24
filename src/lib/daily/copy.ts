@@ -1,3 +1,4 @@
+import { LAG_DAYS } from "@/config/education";
 import { narrateLayer } from "@/lib/detection/narrate";
 import type { ChartFacts, DetectedSetup, Ohlcv } from "@/lib/detection/types";
 import { DISCLAIMER } from "./compliance";
@@ -24,12 +25,14 @@ export type BuiltSection = {
     candles: Ohlcv[];
     setup: DetectedSetup;
     hideAfterPattern: boolean;
+    isSynthetic: boolean;
   };
   charts?: Array<{
     symbol: string;
     candles: Ohlcv[];
     setup: DetectedSetup;
     label: string;
+    isSynthetic: boolean;
   }>;
   quiz?: QuizItem[];
   extras?: Record<string, string | number | null>;
@@ -62,6 +65,7 @@ export function marketStory(date: string, nifty: ChartFacts & { candles: Ohlcv[]
     ? "I don't have that data"
     : `${(nLast.volume / nifty.volumeAvg20).toFixed(2)}×`;
   return [
+    `Closed session from ${date}, shown after the ${LAG_DAYS}-day educational delay. Not today's market.`,
     `On ${date} (closed session), NIFTY printed open ${rupee(nLast.open)}, high ${rupee(nLast.high)}, low ${rupee(nLast.low)}, close ${rupee(nLast.close)}. Change vs the prior close: ${nChange}. Volume vs its 20-bar average: ${nVol}.`,
     `BANK NIFTY closed at ${rupee(bLast.close)} (range ${rupee(bLast.low)}–${rupee(bLast.high)}). Change vs the prior close: ${bChange}.`,
     "Only price and volume are described. No news, flows, or reasons are invented.",
@@ -94,9 +98,9 @@ export function trapCopy(pick: PickedSetup | null, twinName: string | null): str
   ];
 }
 
-export function predictCopy(pick: PickedSetup): string[] {
+export function predictCopy(pick: PickedSetup, sessionDate: string): string[] {
   return [
-    `${pick.symbol} daily. Candles after the pattern stay hidden until you lock a prediction. The last bar on this tape is already closed — this is not a live tip.`,
+    `Closed session from ${sessionDate}, shown after the ${LAG_DAYS}-day educational delay. ${pick.symbol} daily. Candles after the pattern stay hidden until you lock a prediction. The last bar on this tape is already closed — this is not a live tip.`,
     `The engine labelled a ${pick.setup.name} ending at bar ${pick.setup.endIndex + 1}. Textbook bias is ${pick.setup.bias}. That is a label, not a forecast.`,
     DISCLAIMER,
   ];
@@ -134,7 +138,7 @@ export function riskDrillCopy(pick: PickedSetup | null): { paragraphs: string[];
   };
 }
 
-export function ruleCheckCopy(tapes: Array<{ symbol: string; facts: ChartFacts; candles: Ohlcv[] }>): string[] {
+export function ruleCheckCopy(tapes: Array<{ symbol: string; facts: ChartFacts; candles: Ohlcv[] }>, sessionDate: string): string[] {
   const matched: string[] = [];
   for (const tape of tapes) {
     if (tape.symbol === "NIFTY" || tape.symbol === "BANKNIFTY") continue;
@@ -145,7 +149,7 @@ export function ruleCheckCopy(tapes: Array<{ symbol: string; facts: ChartFacts; 
     if (above && heavy) matched.push(tape.symbol);
   }
   return [
-    "Study rule (educational only): last close above EMA(20) and session volume greater than 1.5× the 20-bar average.",
+    `Study rule (educational only) on the closed lagged session ${sessionDate}: last close above EMA(20) and session volume greater than 1.5× the 20-bar average.`,
     matched.length === 0
       ? "No constituent in this synthetic universe matched the rule on the closed session."
       : `Symbols that matched: ${matched.join(", ")}.`,
@@ -212,5 +216,6 @@ export function chartPayload(pick: PickedSetup, hideAfterPattern: boolean) {
     candles: snap.candles,
     setup: snap.setup,
     hideAfterPattern,
+    isSynthetic: pick.facts.isSynthetic,
   };
 }

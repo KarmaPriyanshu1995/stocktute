@@ -2,9 +2,8 @@ import { requireAdmin } from "@/lib/auth/requireAdmin";
 import { connectToDatabase } from "@/lib/db/mongoose";
 import { DailyChapter } from "@/models/DailyChapter";
 import { ChapterReview, type ChapterView } from "@/components/admin/ChapterReview";
-import { DISCLAIMER } from "@/lib/daily/compliance";
+import { DISCLAIMER, type ComplianceFlag } from "@/lib/daily/compliance";
 import type { BuiltSection } from "@/lib/daily/copy";
-import type { ComplianceHit } from "@/lib/daily/compliance";
 import Link from "next/link";
 
 export default async function ChapterPage({ params }: { params: Promise<{ date: string }> }) {
@@ -24,16 +23,20 @@ export default async function ChapterPage({ params }: { params: Promise<{ date: 
         </div>
       );
     }
+    const flags = ((doc.compliance?.flags ?? doc.compliance?.hits ?? []) as ComplianceFlag[]);
     const chapter: ChapterView = {
       date: doc.date,
+      sessionDate: doc.sessionDate,
       status: doc.status,
       autoPublish: doc.autoPublish,
       source: doc.source,
+      isSynthetic: doc.isSynthetic ?? true,
       disclaimer: doc.disclaimer ?? DISCLAIMER,
       sections: (doc.sections ?? []) as BuiltSection[],
       compliance: {
         blockedCount: doc.compliance?.blockedCount ?? 0,
-        hits: (doc.compliance?.hits ?? []) as ComplianceHit[],
+        flags,
+        hits: flags,
       },
       reviewNote: doc.reviewNote ?? "",
     };

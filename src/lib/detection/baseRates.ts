@@ -45,3 +45,7 @@ export function lookupBaseRate(
 ): BaseRate {
   return table?.[name] ?? EMPTY_BASE_RATE();
 }
+
+export function isSyntheticUniverse(universe: string): boolean {
+  return /synthetic|fixture|unavailable/i.test(universe);
+}

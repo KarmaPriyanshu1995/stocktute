@@ -1,18 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { LightweightChart } from "@/components/charts/LightweightChart";
 import { PatternReplay } from "@/components/learn/PatternReplay";
+import { DemoDataBadge } from "@/components/learn/DemoDataBadge";
 import type { ClassroomLesson } from "@/lib/detection/classroomLesson";
-import {
-  LAYERS,
-  narrateLayer,
-  outcomeBucket,
-  type TutorLayer,
-} from "@/lib/detection/narrate";
+import { LAYERS, narrateLayer, type TutorLayer } from "@/lib/detection/narrate";
 import { scorePrediction } from "@/lib/journal/score";
 import type { ExpectedMove } from "@/lib/detection/types";
+import { track } from "@/lib/analytics/track";
+import { t } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 const LAYER_LABEL: Record<TutorLayer, string> = {
@@ -35,6 +33,10 @@ export function ClassroomTutor({ lesson }: Props) {
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [journaled, setJournaled] = useState(false);
 
+  useEffect(() => {
+    track("lesson_started", { chartKey: lesson.chartKey, pattern: lesson.pattern });
+  }, [lesson.chartKey, lesson.pattern]);
+
   const primary = lesson.primary;
   const setup = primary.setup;
   const patternFrom = primary.candles[setup.startIndex].time;
@@ -56,6 +58,7 @@ export function ClassroomTutor({ lesson }: Props) {
       studentLevel: lesson.studentLevel,
       weak: lesson.weak.setup,
       failedFiveBarPct: fiveFailed,
+      isSynthetic: lesson.isSynthetic,
     });
   }, [layer, lesson, setup]);
 
@@ -95,8 +98,7 @@ export function ClassroomTutor({ lesson }: Props) {
     if (i < LAYERS.length - 1) setLayer(LAYERS[i + 1]);
   }
 
-  const five = setup.forward.find((f) => f.bars === 5);
-  const actual = outcomeBucket(five?.closeReturnPct ?? null);
+  const actual = scored?.actual ?? null;
 
   const failFrom = lesson.failed.candles[lesson.failed.setup.startIndex].time;
   const failTo = lesson.failed.candles[lesson.failed.setup.endIndex].time;
@@ -116,18 +118,20 @@ export function ClassroomTutor({ lesson }: Props) {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-display text-3xl text-text-primary">AI Classroom</h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="font-display text-3xl text-text-primary">{t(lesson.language, "classroom.title")}</h1>
+            <DemoDataBadge show={lesson.isSynthetic} language={lesson.language} />
+          </div>
           <p className="text-sm text-text-secondary">
-            {lesson.symbol} · daily · Level {lesson.studentLevel} vocabulary. Numbers come from the
-            detection engine, not from the tutor inventing them.
+            {t(lesson.language, "classroom.subtitle", { symbol: lesson.symbol, level: lesson.studentLevel })}
           </p>
         </div>
         <div className="flex gap-3">
           <Link href="/journal" className="text-xs text-text-tertiary hover:text-accent">
-            Mistake journal
+            {t(lesson.language, "classroom.journalLink")}
           </Link>
           <Link href="/classroom/live" className="text-xs text-text-tertiary hover:text-accent">
-            Live tape (sandbox)
+            {t(lesson.language, "classroom.sandboxLink")}
           </Link>
         </div>
       </div>
@@ -243,7 +247,7 @@ export function ClassroomTutor({ lesson }: Props) {
                   rows={3}
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
-                  placeholder="One line: which printed fact are you using?"
+                  placeholder={t(lesson.language, "classroom.placeholderReason")}
                   className="rounded-md border border-bg-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent"
                 />
               </form>
@@ -259,8 +263,13 @@ export function ClassroomTutor({ lesson }: Props) {
                 </p>
                 {journaled && (
                   <Link href="/journal" className="text-xs text-accent">
-                    This miss is saved in your mistake journal with the chart snapshot.
+                    This note is saved in your journal with the chart snapshot.
                   </Link>
+                )}
+                {scored?.tags.includes("lucky-outcome") && (
+                  <p className="text-xs text-text-tertiary">
+                    Direction matched, but the reason was thin — tagged as a lucky outcome.
+                  </p>
                 )}
                 {scored?.matched === true && (
                   <p className="text-xs text-text-tertiary">
@@ -288,11 +297,11 @@ export function ClassroomTutor({ lesson }: Props) {
             >
               {layer === "predict"
                 ? saveState === "saving"
-                  ? "Locking…"
-                  : "Lock prediction and reveal"
+                  ? t(lesson.language, "classroom.locking")
+                  : t(lesson.language, "classroom.lock")
                 : layer === "failure"
-                  ? "Lesson complete"
-                  : "Continue"}
+                  ? t(lesson.language, "classroom.complete")
+                  : t(lesson.language, "classroom.continue")}
             </button>
           </div>
         </aside>

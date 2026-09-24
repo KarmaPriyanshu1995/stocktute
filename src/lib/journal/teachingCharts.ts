@@ -1,4 +1,8 @@
-import { buildHammerClassroomLesson, HAMMER_PRIMARY_CHART_KEY } from "@/lib/detection/classroomLesson";
+import {
+  buildClassroomLesson,
+  HAMMER_PRIMARY_CHART_KEY,
+  parseChartKey,
+} from "@/lib/detection/classroomLesson";
 import type { DetectedSetup, Ohlcv } from "@/lib/detection/types";
 
 export { HAMMER_PRIMARY_CHART_KEY };
@@ -8,6 +12,7 @@ export type TeachingChart = {
   source: "classroom";
   symbol: string;
   timeframe: string;
+  isSynthetic: true;
   candles: Ohlcv[];
   setup: DetectedSetup;
 };
@@ -17,14 +22,21 @@ export type TeachingChart = {
  * engine — the client only submits direction, confidence, and reason.
  */
 export function resolveTeachingChart(chartKey: string): TeachingChart | null {
-  if (chartKey !== HAMMER_PRIMARY_CHART_KEY) return null;
-  const lesson = buildHammerClassroomLesson(2);
+  if (!parseChartKey(chartKey)) return null;
+  const lesson = buildClassroomLesson(chartKey);
+  const chart =
+    parseChartKey(chartKey)?.variant === "weak"
+      ? lesson.weak
+      : parseChartKey(chartKey)?.variant === "failed"
+        ? lesson.failed
+        : lesson.primary;
   return {
-    chartKey: HAMMER_PRIMARY_CHART_KEY,
+    chartKey,
     source: "classroom",
     symbol: lesson.symbol,
     timeframe: lesson.timeframe,
-    candles: lesson.primary.candles,
-    setup: lesson.primary.setup,
+    isSynthetic: true,
+    candles: chart.candles,
+    setup: chart.setup,
   };
 }

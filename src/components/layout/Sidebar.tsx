@@ -1,32 +1,24 @@
 import Link from "next/link";
 import { auth } from "@/auth";
+import { t } from "@/lib/i18n";
 
 const NAV = [
   {
     label: "Learn",
     items: [
-      { href: "/dashboard", label: "Dashboard" },
-      { href: "/skill-tree", label: "Skill Tree" },
-      { href: "/lessons", label: "Lessons" },
-      { href: "/classroom", label: "AI Classroom" },
-      { href: "/drills", label: "Drills" },
+      { href: "/dashboard", labelKey: "nav.dashboard" as const },
+      { href: "/skill-tree", labelKey: "nav.skillTree" as const },
+      { href: "/lessons", labelKey: "nav.lessons" as const },
+      { href: "/classroom", labelKey: "nav.classroom" as const },
+      { href: "/drills", labelKey: "nav.drills" as const },
     ],
   },
   {
     label: "Practice",
     items: [
-      { href: "/risk", label: "Risk calculator" },
-      { href: "/formulas", label: "Formula Builder" },
-      { href: "/simulator", label: "Simulator" },
-      { href: "/replay", label: "Replay" },
-      { href: "/journal", label: "Journal" },
-    ],
-  },
-  {
-    label: "Account",
-    items: [
-      { href: "/leaderboard", label: "Leaderboard" },
-      { href: "/billing", label: "Billing" },
+      { href: "/risk", labelKey: "nav.risk" as const },
+      { href: "/formulas", labelKey: "nav.formulas" as const },
+      { href: "/journal", labelKey: "nav.journal" as const },
     ],
   },
 ] as const;
@@ -53,20 +45,25 @@ export async function Sidebar() {
                   href={item.href}
                   className="rounded-md px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-bg-surface-hover hover:text-text-primary"
                 >
-                  {item.label}
+                  {t("en", item.labelKey)}
                 </Link>
               ))}
-              {group.label === "Account" && isAdmin ? (
-                <Link
-                  href="/admin"
-                  className="rounded-md px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-bg-surface-hover hover:text-text-primary"
-                >
-                  Admin
-                </Link>
-              ) : null}
             </div>
           </div>
         ))}
+        {isAdmin ? (
+          <div>
+            <div className="px-3 pb-1 font-mono text-[10px] uppercase tracking-widest text-text-tertiary">
+              Account
+            </div>
+            <Link
+              href="/admin"
+              className="rounded-md px-3 py-2 text-sm text-text-secondary transition-colors hover:bg-bg-surface-hover hover:text-text-primary"
+            >
+              {t("en", "nav.admin")}
+            </Link>
+          </div>
+        ) : null}
       </nav>
     </aside>
   );

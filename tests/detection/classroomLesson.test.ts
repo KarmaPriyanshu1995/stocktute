@@ -28,5 +28,12 @@ describe("classroom historical lesson", () => {
     };
     const script = narrateLayer(setup, "reveal");
     expect(script.paragraphs.join(" ")).toContain("I don't have a historical base rate");
+    expect(script.paragraphs.join(" ")).not.toContain("46%");
+  });
+
+  it("hides synthetic teaching-set frequencies from the student", () => {
+    const script = narrateLayer(lesson.primary.setup, "reveal", { isSynthetic: true });
+    expect(script.paragraphs.join(" ")).toContain("I don't have a historical base rate");
+    expect(script.paragraphs.join(" ")).not.toMatch(/46%/);
   });
 });

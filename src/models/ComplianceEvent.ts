@@ -6,7 +6,10 @@ const complianceEventSchema = new Schema(
     sectionId: { type: String, default: "unknown" },
     phrase: { type: String, required: true },
     original: { type: String, required: true },
-    rewritten: { type: String, required: true },
+    suggestion: { type: String, default: "" },
+    rewritten: { type: String, default: "" },
+    resolved: { type: Boolean, default: false },
+    resolution: { type: String, enum: ["rewritten", "accepted", "dismissed"] },
   },
   { timestamps: true },
 );

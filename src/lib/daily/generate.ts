@@ -2,7 +2,7 @@ import { analyzeChart } from "@/lib/detection/engine";
 import { tallyBaseRates } from "@/lib/detection/baseRates";
 import type { ChartFacts, Ohlcv } from "@/lib/detection/types";
 import { skipReason } from "./calendar";
-import { DISCLAIMER, filterParagraphs, type ComplianceHit } from "./compliance";
+import { DISCLAIMER, filterParagraphs, unresolvedFlagCount, type ComplianceFlag } from "./compliance";
 import {
   chartPayload,
   marketStory,
@@ -17,25 +17,33 @@ import {
 import { pickTeachingSetups, type AnalyzedTape } from "./select";
 import { buildUniverseTapes } from "./tapes";
 import { SECTION_META } from "./universe";
+import { assertEducationalLag, istNoon, laggedTradingSession } from "@/lib/compliance/dataLag";
 
 export type BuiltChapter = {
   date: string;
+  sessionDate: string;
   status: "draft";
   disclaimer: string;
   source: "synthetic-eod";
+  isSynthetic: true;
   sections: BuiltSection[];
-  compliance: { blockedCount: number; hits: ComplianceHit[] };
+  compliance: { blockedCount: number; flags: ComplianceFlag[]; hits: ComplianceFlag[] };
 };
 
 export type GenerateResult =
   | { ok: true; chapter: BuiltChapter }
   | { ok: false; skipped: "weekend" | "holiday" };
 
-function analyzeTapes(date: string): AnalyzedTape[] {
-  const tapes = buildUniverseTapes(date);
+function analyzeTapes(sessionDate: string): AnalyzedTape[] {
+  const tapes = buildUniverseTapes(sessionDate);
   const first = tapes.map((tape) => ({
     ...tape,
-    facts: analyzeChart({ candles: tape.candles, symbol: tape.symbol, timeframe: "1D" }),
+    facts: analyzeChart({
+      candles: tape.candles,
+      symbol: tape.symbol,
+      timeframe: "1D",
+      isSynthetic: true,
+    }),
   }));
   const table = tallyBaseRates(
     first.flatMap((t) => t.facts.setups),
@@ -47,6 +55,7 @@ function analyzeTapes(date: string): AnalyzedTape[] {
       candles: tape.candles,
       symbol: tape.symbol,
       timeframe: "1D",
+      isSynthetic: true,
       baseRates: table,
     }),
   }));
@@ -63,30 +72,39 @@ function indexView(tapes: AnalyzedTape[], symbol: string): ChartFacts & { candle
       ema20: null,
       ema50: null,
       rsi14: null,
+      atr14: null,
       volumeAvg20: null,
       supportLevels: [],
       resistanceLevels: [],
       setups: [],
       missingFacts: ["I don't have that data"],
+      isSynthetic: true,
       candles: [],
     };
   }
   return { ...tape.facts, candles: tape.candles };
 }
 
+/**
+ * `date` is the run / as-of day. The tape is the last NSE session at least
+ * 30 calendar days earlier.
+ */
 export function generateDailyChapter(date: string): GenerateResult {
   const skipped = skipReason(date);
   if (skipped) return { ok: false, skipped };
 
-  const tapes = analyzeTapes(date);
+  const sessionDate = laggedTradingSession(date);
+  assertEducationalLag(sessionDate, istNoon(date));
+
+  const tapes = analyzeTapes(sessionDate);
   const picks = pickTeachingSetups(tapes);
-  const hits: ComplianceHit[] = [];
+  const flags: ComplianceFlag[] = [];
   const risk = riskDrillCopy(picks.patternOfDay);
 
   const raw: BuiltSection[] = [
     {
       ...SECTION_META[0],
-      paragraphs: marketStory(date, indexView(tapes, "NIFTY"), indexView(tapes, "BANKNIFTY")),
+      paragraphs: marketStory(sessionDate, indexView(tapes, "NIFTY"), indexView(tapes, "BANKNIFTY")),
     },
     {
       ...SECTION_META[1],
@@ -98,7 +116,7 @@ export function generateDailyChapter(date: string): GenerateResult {
     {
       ...SECTION_META[2],
       paragraphs: picks.predict
-        ? predictCopy(picks.predict)
+        ? predictCopy(picks.predict, sessionDate)
         : ["I don't have a closed yesterday-bar for predict-and-reveal.", DISCLAIMER],
       chart: picks.predict ? chartPayload(picks.predict, true) : undefined,
     },
@@ -127,7 +145,7 @@ export function generateDailyChapter(date: string): GenerateResult {
     },
     {
       ...SECTION_META[6],
-      paragraphs: ruleCheckCopy(tapes),
+      paragraphs: ruleCheckCopy(tapes, sessionDate),
     },
     {
       ...SECTION_META[7],
@@ -138,24 +156,38 @@ export function generateDailyChapter(date: string): GenerateResult {
 
   const sections = raw.map((s) => {
     const body = filterParagraphs(s.paragraphs);
-    hits.push(...body.hits);
+    flags.push(...body.flags);
     const quiz = s.quiz?.map((q) => {
       const p = filterParagraphs([q.prompt]);
-      hits.push(...p.hits);
+      flags.push(...p.flags);
       return { ...q, prompt: p.paragraphs[0] ?? q.prompt };
     });
     return { ...s, paragraphs: body.paragraphs, quiz };
   });
 
+  const blockedCount = unresolvedFlagCount(flags);
+
   return {
     ok: true,
     chapter: {
       date,
+      sessionDate,
       status: "draft",
       disclaimer: DISCLAIMER,
       source: "synthetic-eod",
+      isSynthetic: true,
       sections,
-      compliance: { blockedCount: hits.length, hits },
+      compliance: { blockedCount, flags, hits: flags },
     },
   };
+}
+
+export function chapterPublishStatus(
+  chapter: Pick<BuiltChapter, "isSynthetic" | "compliance">,
+  autoPublish: boolean,
+): "published" | "draft" {
+  if (!autoPublish) return "draft";
+  if (chapter.isSynthetic) return "draft";
+  if (unresolvedFlagCount(chapter.compliance.flags) > 0) return "draft";
+  return "published";
 }

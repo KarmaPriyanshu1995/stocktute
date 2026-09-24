@@ -15,7 +15,7 @@ async function main() {
     return;
   }
   console.log(
-    `[daily-chapter] saved ${result.chapter.date} status=${result.chapter.status} sections=${result.chapter.sections.length} compliance=${result.chapter.compliance.blockedCount}`,
+    `[daily-chapter] saved ${result.chapter.date} session=${result.chapter.sessionDate} status=${result.chapter.status} sections=${result.chapter.sections.length} compliance=${result.chapter.compliance.blockedCount}`,
   );
 }
 

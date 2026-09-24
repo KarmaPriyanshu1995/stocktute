@@ -4,6 +4,7 @@ import {
   type ExpectedMove,
   type PatternContext,
 } from "./types";
+import { isSyntheticUniverse } from "./baseRates";
 
 export const LAYERS = ["what", "why", "context", "predict", "reveal", "failure"] as const;
 export type TutorLayer = (typeof LAYERS)[number];
@@ -44,9 +45,9 @@ function missing(setup: DetectedSetup, extra: string[]): string[] {
   return [`I don't have that data for: ${gaps.join(", ")}.`];
 }
 
-function baseRateLine(setup: DetectedSetup): string {
+function baseRateLine(setup: DetectedSetup, isSynthetic = false): string {
   const { sampleSize, hitRate, universe } = setup.baseRate;
-  if (hitRate == null || sampleSize === 0) {
+  if (isSynthetic || hitRate == null || sampleSize === 0 || isSyntheticUniverse(universe)) {
     return "I don't have a historical base rate for this pattern on this run.";
   }
   return `In the ${universe} set, ${Math.round(hitRate * 100)}% of ${sampleSize} ${setup.name} examples had a close 5 bars later in the textbook direction. That is a past frequency, not a forecast.`;
@@ -67,7 +68,12 @@ export function stopLossLine(invalidation: number, studentLevel: number): string
 export function narrateLayer(
   setup: DetectedSetup,
   layer: TutorLayer,
-  opts: { studentLevel?: number; weak?: DetectedSetup; failedFiveBarPct?: number | null } = {},
+  opts: {
+    studentLevel?: number;
+    weak?: DetectedSetup;
+    failedFiveBarPct?: number | null;
+    isSynthetic?: boolean;
+  } = {},
 ): TutorScript {
   const studentLevel = opts.studentLevel ?? 2;
   const c = setup.context;
@@ -144,7 +150,7 @@ export function narrateLayer(
       title: "What the next bars actually did",
       paragraphs: [
         outcome,
-        baseRateLine(setup),
+        baseRateLine(setup, opts.isSynthetic),
         "One path on one chart is an anecdote. It does not prove the pattern generally works or fails.",
         ...extraMissing,
         CLASSROOM_DISCLAIMER,

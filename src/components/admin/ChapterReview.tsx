@@ -3,18 +3,21 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LightweightChart } from "@/components/charts/LightweightChart";
+import { DemoDataBadge } from "@/components/learn/DemoDataBadge";
 import type { BuiltSection } from "@/lib/daily/copy";
-import type { ComplianceHit } from "@/lib/daily/compliance";
+import type { ComplianceFlag } from "@/lib/daily/compliance";
 import { cn } from "@/lib/utils";
 
 export type ChapterView = {
   date: string;
+  sessionDate?: string;
   status: string;
   autoPublish: boolean;
   source: string;
+  isSynthetic?: boolean;
   disclaimer: string;
   sections: BuiltSection[];
-  compliance: { blockedCount: number; hits: ComplianceHit[] };
+  compliance: { blockedCount: number; flags?: ComplianceFlag[]; hits?: ComplianceFlag[] };
   reviewNote: string;
 };
 
@@ -27,9 +30,11 @@ export function ChapterReview({ chapter }: { chapter: ChapterView }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const flags = chapter.compliance.flags ?? chapter.compliance.hits ?? [];
   const blocked = chapter.compliance.blockedCount;
+  const canApprove = blocked === 0;
 
-  async function post(action: "save" | "approve" | "reject" | "publish") {
+  async function post(action: "save" | "approve" | "reject" | "publish" | "resolve-flag", extra: Record<string, unknown> = {}) {
     setBusy(action);
     setError(null);
     const paragraphs = Object.fromEntries(
@@ -45,7 +50,7 @@ export function ChapterReview({ chapter }: { chapter: ChapterView }) {
       const res = await fetch(`/api/admin/chapters/${chapter.date}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, reviewNote: note, paragraphs }),
+        body: JSON.stringify({ action, reviewNote: note, paragraphs, ...extra }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
@@ -71,23 +76,39 @@ export function ChapterReview({ chapter }: { chapter: ChapterView }) {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="font-mono text-[10px] uppercase tracking-wide text-text-tertiary">
-            SEBI-partner review · {chapter.source}
+            SEBI-partner review · {chapter.source} · session {chapter.sessionDate ?? chapter.date}
           </p>
-          <h1 className="font-display text-3xl text-text-primary">Chapter {chapter.date}</h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="font-display text-3xl text-text-primary">Chapter {chapter.date}</h1>
+            <DemoDataBadge show={chapter.isSynthetic !== false} />
+          </div>
           <p className={cn("text-sm", statusTone)}>Status: {chapter.status}</p>
         </div>
         <p className="text-xs text-text-tertiary">{chapter.disclaimer}</p>
       </div>
 
-      {blocked > 0 && (
+      {flags.length > 0 && (
         <section className="rounded-lg border border-bg-border bg-bg-raised p-4">
           <h2 className="text-sm font-medium text-text-primary">
-            Compliance log ({blocked} rewrite{blocked === 1 ? "" : "s"})
+            Compliance flags ({blocked} unresolved)
           </h2>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-text-secondary">
-            {chapter.compliance.hits.slice(0, 12).map((hit, i) => (
-              <li key={`${hit.phrase}-${i}`}>
-                <span className="font-mono text-xs text-accent">{hit.phrase}</span> → {hit.rewritten}
+          <p className="mt-1 text-xs text-text-tertiary">
+            Original wording is kept. Rewrite or dismiss each flag before approve/publish.
+          </p>
+          <ul className="mt-2 space-y-2 text-sm text-text-secondary">
+            {flags.slice(0, 20).map((flag, i) => (
+              <li key={`${flag.phrase}-${i}`} className="rounded-md border border-bg-border px-3 py-2">
+                <span className="font-mono text-xs text-accent">{flag.phrase}</span>
+                {flag.resolved ? " · resolved" : ` · suggestion: ${flag.suggestion}`}
+                {!flag.resolved && (
+                  <button
+                    type="button"
+                    className="ml-3 text-xs text-accent"
+                    onClick={() => void post("resolve-flag", { flagIndex: i, resolution: "accepted" })}
+                  >
+                    Mark resolved
+                  </button>
+                )}
               </li>
             ))}
           </ul>
@@ -117,6 +138,7 @@ export function ChapterReview({ chapter }: { chapter: ChapterView }) {
               />
               <p className="mt-1 font-mono text-[10px] text-text-tertiary">
                 {section.chart.symbol} · {section.chart.setup.name} · engine snapshot
+                {section.chart.isSynthetic ? " · demo" : ""}
               </p>
             </div>
           )}
@@ -162,17 +184,17 @@ export function ChapterReview({ chapter }: { chapter: ChapterView }) {
         </button>
         <button
           type="button"
-          disabled={Boolean(busy)}
+          disabled={Boolean(busy) || !canApprove}
           onClick={() => void post("approve")}
-          className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-text-inverse"
+          className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-text-inverse disabled:opacity-40"
         >
           {busy === "approve" ? "…" : chapter.autoPublish ? "Approve & publish" : "Approve"}
         </button>
         <button
           type="button"
-          disabled={Boolean(busy)}
+          disabled={Boolean(busy) || !canApprove}
           onClick={() => void post("publish")}
-          className="rounded-md border border-bg-border px-4 py-2 text-sm text-text-secondary"
+          className="rounded-md border border-bg-border px-4 py-2 text-sm text-text-secondary disabled:opacity-40"
         >
           Publish
         </button>

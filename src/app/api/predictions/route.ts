@@ -4,9 +4,10 @@ import mongoose from "mongoose";
 import { auth } from "@/auth";
 import { connectToDatabase } from "@/lib/db/mongoose";
 import { resolveTeachingChart } from "@/lib/journal/teachingCharts";
-import { scorePrediction } from "@/lib/journal/score";
+import { scorePrediction, shouldJournal } from "@/lib/journal/score";
 import { Prediction } from "@/models/Prediction";
 import { MistakeJournalEntry } from "@/models/MistakeJournalEntry";
+import { track } from "@/lib/analytics/track";
 
 const bodySchema = z.object({
   chartKey: z.string().min(3).max(120),
@@ -37,6 +38,7 @@ export async function POST(req: Request) {
     reason: parsed.data.reason,
     setup: chart.setup,
   });
+  const journaled = shouldJournal(scored);
 
   try {
     await connectToDatabase();
@@ -57,6 +59,8 @@ export async function POST(req: Request) {
           actual: scored.actual,
           closeReturnPct: scored.closeReturnPct,
           matched: scored.matched,
+          reasoningScore: scored.reasoningScore,
+          outcomeResult: scored.outcomeResult,
           tags: scored.tags,
           snapshot,
           user: userId,
@@ -66,7 +70,7 @@ export async function POST(req: Request) {
       { upsert: true, new: true },
     );
 
-    if (scored.matched === false && scored.actual) {
+    if (journaled) {
       await MistakeJournalEntry.findOneAndUpdate(
         { user: userId, chartKey: chart.chartKey },
         {
@@ -82,6 +86,8 @@ export async function POST(req: Request) {
             reason: parsed.data.reason,
             actual: scored.actual,
             closeReturnPct: scored.closeReturnPct,
+            reasoningScore: scored.reasoningScore,
+            outcomeResult: scored.outcomeResult,
             tags: scored.tags,
             snapshot,
           },
@@ -92,13 +98,23 @@ export async function POST(req: Request) {
       await MistakeJournalEntry.deleteOne({ user: userId, chartKey: chart.chartKey });
     }
 
+    track("prediction_locked", {
+      distinctId: session.user.id,
+      chartKey: chart.chartKey,
+      matched: scored.matched,
+      outcomeResult: scored.outcomeResult,
+      reasoningScore: scored.reasoningScore,
+    });
+
     return NextResponse.json({
       ok: true,
       matched: scored.matched,
       actual: scored.actual,
       closeReturnPct: scored.closeReturnPct,
+      outcomeResult: scored.outcomeResult,
+      reasoningScore: scored.reasoningScore,
       tags: scored.tags,
-      journaled: scored.matched === false,
+      journaled,
     });
   } catch (error) {
     console.error("[predictions] save failed", error);

@@ -46,7 +46,7 @@ export default async function AdminPage() {
                   <span className="text-xs text-text-tertiary">
                     {c.status}
                     {(c.compliance?.blockedCount ?? 0) > 0
-                      ? ` · ${c.compliance?.blockedCount} compliance rewrites`
+                      ? ` · ${c.compliance?.blockedCount} compliance flags`
                       : ""}
                   </span>
                 </Link>

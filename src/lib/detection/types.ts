@@ -21,6 +21,7 @@ export type PatternContext = {
   closeVsEma20: "above" | "below" | "at" | null;
   closeVsEma50: "above" | "below" | "at" | null;
   rsi14: number | null;
+  atr14: number | null;
   nearestSupport: number | null;
   nearestResistance: number | null;
   distanceToSupportPct: number | null;
@@ -71,18 +72,22 @@ export type ChartFacts = {
   ema20: number | null;
   ema50: number | null;
   rsi14: number | null;
+  atr14: number | null;
   volumeAvg20: number | null;
   supportLevels: number[];
   resistanceLevels: number[];
   setups: DetectedSetup[];
   /** Human-readable gaps the LLM must not invent around, e.g. missing base rates. */
   missingFacts: string[];
+  /** Fixture or generated tape — never shown as live market history. */
+  isSynthetic: boolean;
 };
 
 export type AnalyzeChartInput = {
   candles: Ohlcv[];
   symbol?: string;
   timeframe?: string;
+  isSynthetic?: boolean;
   /** Optional precomputed table keyed by pattern name. Omitted names get sampleSize 0. */
   baseRates?: Partial<Record<string, BaseRate>>;
 };

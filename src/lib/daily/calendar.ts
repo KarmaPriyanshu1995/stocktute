@@ -1,3 +1,5 @@
+import { isListedNseHoliday } from "./holidays";
+
 const IST = "Asia/Kolkata";
 
 /** YYYY-MM-DD in Asia/Kolkata. */
@@ -31,45 +33,13 @@ export function weekdayIst(date: string): number {
   return noonIstUtc(date).getUTCDay();
 }
 
-/**
- * Closed NSE cash-market holidays. Not a substitute for the official circular —
- * replace this list when a licensed calendar is wired.
- */
-export const NSE_HOLIDAYS = new Set([
-  "2025-01-26",
-  "2025-02-26",
-  "2025-03-14",
-  "2025-03-31",
-  "2025-04-10",
-  "2025-04-14",
-  "2025-04-18",
-  "2025-05-01",
-  "2025-08-15",
-  "2025-08-27",
-  "2025-10-02",
-  "2025-10-21",
-  "2025-10-22",
-  "2025-11-05",
-  "2025-12-25",
-  "2026-01-26",
-  "2026-03-03",
-  "2026-03-31",
-  "2026-04-03",
-  "2026-04-14",
-  "2026-05-01",
-  "2026-08-15",
-  "2026-10-02",
-  "2026-11-12",
-  "2026-12-25",
-]);
-
 export function isWeekend(date: string): boolean {
   const day = weekdayIst(date);
   return day === 0 || day === 6;
 }
 
 export function isNseHoliday(date: string): boolean {
-  return NSE_HOLIDAYS.has(date);
+  return isListedNseHoliday(date);
 }
 
 export function isNseTradingDay(date: string): boolean {

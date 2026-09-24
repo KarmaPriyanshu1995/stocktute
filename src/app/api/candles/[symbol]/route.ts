@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db/mongoose";
 import { Candle, TIMEFRAMES, type Timeframe } from "@/models/Candle";
 import { generateHistory } from "@/lib/priceFeed/generateHistory";
+import { LAG_DAYS } from "@/config/education";
+import { clampCandlesToLag, lagCutoffUnix } from "@/lib/compliance/dataLag";
 
 const MIN_STUDY_BARS = 80;
 
@@ -44,7 +46,8 @@ export async function GET(
   }
 
   const limit = Math.min(Number(searchParams.get("limit") ?? 500), 2000);
-  const fallback = generateHistory(upper, timeframe, Math.min(limit, 240));
+  const cutoffMs = lagCutoffUnix() * 1000;
+  const fallback = clampCandlesToLag(generateHistory(upper, timeframe, Math.min(limit, 240), cutoffMs));
 
   try {
     await connectToDatabase();
@@ -53,19 +56,39 @@ export async function GET(
       .limit(limit)
       .lean();
 
-    const stored = serialize(candles.reverse());
+    const stored = clampCandlesToLag(serialize(candles.reverse()));
+    const fromDb = isStudyReady(stored);
+    const lagged = fromDb ? stored : fallback;
+
+    if (lagged.length === 0) {
+      return NextResponse.json(
+        { error: "educational_lag", lagDays: LAG_DAYS, isSynthetic: true },
+        { status: 422 },
+      );
+    }
+
     return NextResponse.json({
       symbol: upper,
       timeframe,
-      source: isStudyReady(stored) ? "db" : "generated",
-      candles: isStudyReady(stored) ? stored : fallback,
+      source: fromDb ? "db" : "generated",
+      isSynthetic: true,
+      lagDays: LAG_DAYS,
+      candles: lagged,
     });
   } catch (error) {
     console.error("[candles] falling back to generated history", error);
+    if (fallback.length === 0) {
+      return NextResponse.json(
+        { error: "educational_lag", lagDays: LAG_DAYS, isSynthetic: true },
+        { status: 422 },
+      );
+    }
     return NextResponse.json({
       symbol: upper,
       timeframe,
       source: "generated",
+      isSynthetic: true,
+      lagDays: LAG_DAYS,
       candles: fallback,
     });
   }

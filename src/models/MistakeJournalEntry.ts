@@ -24,8 +24,10 @@ const mistakeJournalEntrySchema = new Schema(
     direction: { type: String, enum: ["up", "down", "sideways"], required: true },
     confidence: { type: Number, required: true },
     reason: { type: String, required: true, trim: true },
-    actual: { type: String, enum: ["up", "down", "sideways"], required: true },
+    actual: { type: String, enum: ["up", "down", "sideways"], default: null },
     closeReturnPct: { type: Number, default: null },
+    reasoningScore: { type: Number, default: null },
+    outcomeResult: { type: String, enum: ["hit", "miss", "sideways-band", "unavailable"], default: null },
     tags: { type: [String], default: [] },
     snapshot: {
       candles: { type: [ohlcvSchema], required: true },

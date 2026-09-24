@@ -68,3 +68,25 @@ export function lastDefined(series: Array<number | null>): number | null {
   }
   return null;
 }
+
+/** Wilder ATR. First value is SMA of true range over `period` bars (index = period). */
+export function atr(candles: Array<{ high: number; low: number; close: number }>, period = 14): Array<number | null> {
+  const out: Array<number | null> = Array(candles.length).fill(null);
+  if (candles.length <= period) return out;
+
+  const tr: number[] = candles.map((c, i) => {
+    if (i === 0) return c.high - c.low;
+    const prev = candles[i - 1].close;
+    return Math.max(c.high - c.low, Math.abs(c.high - prev), Math.abs(c.low - prev));
+  });
+
+  let sum = 0;
+  for (let i = 1; i <= period; i++) sum += tr[i];
+  let prevAtr = sum / period;
+  out[period] = prevAtr;
+  for (let i = period + 1; i < candles.length; i++) {
+    prevAtr = (prevAtr * (period - 1) + tr[i]) / period;
+    out[i] = prevAtr;
+  }
+  return out;
+}

@@ -32,6 +32,8 @@ const predictionSchema = new Schema(
     actual: { type: String, enum: ["up", "down", "sideways"], default: null },
     closeReturnPct: { type: Number, default: null },
     matched: { type: Boolean, default: null },
+    reasoningScore: { type: Number, default: null },
+    outcomeResult: { type: String, enum: ["hit", "miss", "sideways-band", "unavailable"], default: null },
     tags: { type: [String], default: [] },
 
     snapshot: {

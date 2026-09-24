@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { filterParagraph } from "@/lib/daily/compliance";
 import { formatIstDate, isNseTradingDay, skipReason } from "@/lib/daily/calendar";
-import { generateDailyChapter } from "@/lib/daily/generate";
+import { chapterPublishStatus, generateDailyChapter } from "@/lib/daily/generate";
+import { calendarDaysBetween } from "@/lib/compliance/dataLag";
+import { LAG_DAYS } from "@/config/education";
 import { virtualPositionSize } from "@/lib/daily/positionSize";
 
 describe("NSE session calendar", () => {
@@ -14,18 +16,17 @@ describe("NSE session calendar", () => {
 });
 
 describe("compliance filter", () => {
-  it("rewrites live-trade wording and leaves buyers/sellers alone", () => {
+  it("flags live-trade wording and leaves the original sentence unchanged", () => {
     const buyers = filterParagraph("Sellers pushed price down, but buyers stepped in near the low.");
-    expect(buyers.hits).toEqual([]);
+    expect(buyers.flags).toEqual([]);
     expect(buyers.text).toContain("buyers");
 
     const tip = filterParagraph("Buy RELIANCE, sure-shot, guaranteed, will go up to the target.");
-    expect(tip.hits.map((h) => h.phrase)).toEqual(
+    expect(tip.flags.map((h) => h.phrase)).toEqual(
       expect.arrayContaining(["buy", "sure-shot", "guaranteed", "will go up", "target"]),
     );
-    expect(tip.text.toLowerCase()).not.toMatch(/\bbuy\b/);
-    expect(tip.text.toLowerCase()).not.toContain("sure-shot");
-    expect(tip.text.toLowerCase()).not.toContain("will go up");
+    expect(tip.flags.every((f) => !f.resolved)).toBe(true);
+    expect(tip.text).toBe("Buy RELIANCE, sure-shot, guaranteed, will go up to the target.");
   });
 });
 
@@ -34,12 +35,20 @@ describe("daily chapter generator", () => {
     expect(generateDailyChapter("2026-09-20")).toEqual({ ok: false, skipped: "weekend" });
   });
 
-  it("builds eight fact-grounded sections on a trading day", () => {
+  it("builds eight fact-grounded sections on a lagged trading session", () => {
     const result = generateDailyChapter("2026-09-22");
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.chapter.sections).toHaveLength(8);
+    expect(result.chapter.isSynthetic).toBe(true);
+    expect(isNseTradingDay(result.chapter.sessionDate)).toBe(true);
+    expect(calendarDaysBetween(result.chapter.sessionDate, "2026-09-22")).toBeGreaterThanOrEqual(LAG_DAYS);
+    expect(result.chapter.sessionDate <= "2026-08-23").toBe(true);
+    expect(chapterPublishStatus(result.chapter, true)).toBe("draft");
     expect(result.chapter.disclaimer).toMatch(/Educational content only/);
+    const story = result.chapter.sections.find((s) => s.id === "market-story");
+    expect(story?.paragraphs.join(" ")).toContain(result.chapter.sessionDate);
+    expect(story?.paragraphs.join(" ")).toMatch(/30-day educational delay/);
     const ids = result.chapter.sections.map((s) => s.id);
     expect(ids).toEqual([
       "market-story",

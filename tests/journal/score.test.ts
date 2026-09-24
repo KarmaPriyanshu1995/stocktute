@@ -18,6 +18,8 @@ describe("prediction scoring", () => {
       setup,
     });
     expect(scored.matched).toBe(true);
+    expect(scored.outcomeResult).toBe("hit");
+    expect(scored.reasoningScore).toBeGreaterThanOrEqual(50);
     expect(scored.tags).toEqual([]);
   });
 
@@ -36,6 +38,7 @@ describe("prediction scoring", () => {
       setup: missSetup,
     });
     expect(miss.matched).toBe(false);
+    expect(miss.outcomeResult).toBe("miss");
     expect(miss.tags).toContain("wrong-direction");
     expect(miss.tags).toContain("followed-textbook-bias");
     expect(miss.tags).toContain("certainty-language");
@@ -56,6 +59,55 @@ describe("prediction scoring", () => {
     });
     expect(miss.tags).toContain("ignored-volume");
     expect(miss.tags).toContain("ignored-context");
+  });
+
+  it("tags a lucky outcome when direction matches but the reason is thin", () => {
+    const five = setup.forward.find((f) => f.bars === 5);
+    const returnPct = five!.closeReturnPct!;
+    const direction = returnPct > 0 ? "up" : "down";
+    const scored = scorePrediction({
+      direction,
+      reason: "Hammer always means it will go up from here.",
+      setup,
+    });
+    expect(scored.matched).toBe(true);
+    expect(scored.tags).toContain("lucky-outcome");
+    expect(scored.reasoningScore).toBeLessThan(50);
+  });
+
+  it("tags good process on a miss and does not treat it as a failure habit", () => {
+    const missSetup = {
+      ...setup,
+      forward: setup.forward.map((f) =>
+        f.bars === 5 ? { ...f, closeReturnPct: -3.2, hitExpected: false } : f,
+      ),
+    };
+    const miss = scorePrediction({
+      direction: "up",
+      reason: "Prior downtrend, volume above average, near support. Invalidation is the low; size from that distance.",
+      setup: missSetup,
+    });
+    expect(miss.outcomeResult).toBe("miss");
+    expect(miss.tags).toContain("good-process-bad-outcome");
+    expect(miss.tags).not.toContain("wrong-direction");
+    const habits = summarizeHabits([{ tags: miss.tags }, { tags: miss.tags }]);
+    expect(habits.some((h) => h.tag === "good-process-bad-outcome")).toBe(true);
+    expect(habits.some((h) => h.tag === "wrong-direction")).toBe(false);
+  });
+
+  it("marks outcome unavailable when ATR is missing — never a miss", () => {
+    const noAtr = {
+      ...setup,
+      context: { ...setup.context, atr14: null },
+    };
+    const scored = scorePrediction({
+      direction: "up",
+      reason: "Prior 20-bar downtrend, volume above average, near support.",
+      setup: noAtr,
+    });
+    expect(scored.outcomeResult).toBe("unavailable");
+    expect(scored.matched).toBeNull();
+    expect(scored.tags).not.toContain("wrong-direction");
   });
 
   it("surfaces habits only after two similar misses", () => {

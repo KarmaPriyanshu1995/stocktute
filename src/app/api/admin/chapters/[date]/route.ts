@@ -3,16 +3,22 @@ import { z } from "zod";
 import mongoose from "mongoose";
 import { auth } from "@/auth";
 import { connectToDatabase } from "@/lib/db/mongoose";
-import { filterParagraphs } from "@/lib/daily/compliance";
+import { filterParagraphs, unresolvedFlagCount, type ComplianceFlag } from "@/lib/daily/compliance";
 import { toPlain } from "@/lib/daily/persist";
 import { DailyChapter } from "@/models/DailyChapter";
 import { ComplianceEvent } from "@/models/ComplianceEvent";
 
 const bodySchema = z.object({
-  action: z.enum(["save", "approve", "reject", "publish"]),
+  action: z.enum(["save", "approve", "reject", "publish", "resolve-flag"]),
   reviewNote: z.string().max(2000).optional(),
   paragraphs: z.record(z.string(), z.array(z.string())).optional(),
+  flagIndex: z.number().int().min(0).optional(),
+  resolution: z.enum(["rewritten", "accepted", "dismissed"]).optional(),
 });
+
+function chapterFlags(chapter: { compliance?: { flags?: ComplianceFlag[]; hits?: ComplianceFlag[] } }): ComplianceFlag[] {
+  return (chapter.compliance?.flags ?? chapter.compliance?.hits ?? []) as ComplianceFlag[];
+}
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ date: string }> }) {
   const session = await auth();
@@ -35,35 +41,60 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ date: 
     const chapter = await DailyChapter.findOne({ date });
     if (!chapter) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    const hits = [];
+    let flags = chapterFlags(chapter);
+
     if (parsed.data.paragraphs) {
+      const nextFlags: ComplianceFlag[] = [];
       chapter.sections = chapter.sections.map((section) => {
         const next = parsed.data.paragraphs?.[section.id];
         if (!next) return section;
         const filtered = filterParagraphs(next);
-        hits.push(...filtered.hits.map((h) => ({ ...h, sectionId: section.id })));
+        nextFlags.push(...filtered.flags.map((h) => ({ ...h, sectionId: section.id })));
         return { ...section, paragraphs: filtered.paragraphs };
       });
-      chapter.compliance = {
-        blockedCount: (chapter.compliance?.blockedCount ?? 0) + hits.length,
-        hits: [...(chapter.compliance?.hits ?? []), ...hits],
-      };
-      if (hits.length > 0) {
+      flags = nextFlags;
+      if (nextFlags.length > 0) {
         await ComplianceEvent.insertMany(
-          hits.map((hit) => ({
+          nextFlags.map((hit) => ({
             chapterDate: date,
-            sectionId: hit.sectionId,
+            sectionId: "sectionId" in hit ? String((hit as { sectionId?: string }).sectionId ?? "chapter") : "chapter",
             phrase: hit.phrase,
             original: hit.original,
-            rewritten: hit.rewritten,
+            suggestion: hit.suggestion,
+            rewritten: hit.suggestion,
+            resolved: false,
           })),
         );
       }
     }
 
+    if (parsed.data.action === "resolve-flag") {
+      const idx = parsed.data.flagIndex;
+      if (idx == null || !flags[idx]) {
+        return NextResponse.json({ error: "Unknown flag" }, { status: 400 });
+      }
+      flags[idx] = {
+        ...flags[idx],
+        resolved: true,
+        resolution: parsed.data.resolution ?? "accepted",
+      };
+    }
+
+    const blockedCount = unresolvedFlagCount(flags);
+    chapter.compliance = { blockedCount, flags, hits: flags };
+
     if (parsed.data.reviewNote !== undefined) chapter.reviewNote = parsed.data.reviewNote;
     chapter.reviewer = new mongoose.Types.ObjectId(session.user.id);
     chapter.reviewedAt = new Date();
+
+    if (parsed.data.action === "approve" || parsed.data.action === "publish") {
+      if (blockedCount > 0) {
+        return NextResponse.json(
+          { error: "Unresolved compliance flags", blockedCount },
+          { status: 403 },
+        );
+      }
+    }
 
     if (parsed.data.action === "reject") chapter.status = "rejected";
     else if (parsed.data.action === "publish" || (parsed.data.action === "approve" && chapter.autoPublish)) {

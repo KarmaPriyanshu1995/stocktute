@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ema, rsi, sma } from "@/lib/detection/indicators";
+import { ema, rsi, sma, atr } from "@/lib/detection/indicators";
 import { priorTrend } from "@/lib/detection/trend";
 import { findSupportResistance } from "@/lib/detection/levels";
 import { detectRawPatterns } from "@/lib/detection/patterns";
@@ -27,6 +27,19 @@ describe("indicators", () => {
     const series = rsi(closes, 14);
     expect(series[14]).toBe(100);
     expect(series[13]).toBeNull();
+  });
+
+  it("Wilder ATR seeds after 14 true ranges", () => {
+    const candles = Array.from({ length: 20 }, (_, i) => ({
+      high: 12,
+      low: 10,
+      close: 11,
+    }));
+    candles[0] = { high: 12, low: 10, close: 11 };
+    const series = atr(candles, 14);
+    expect(series[13]).toBeNull();
+    expect(series[14]).toBeCloseTo(2);
+    expect(series[19]).toBeCloseTo(2);
   });
 });
 
@@ -171,7 +184,8 @@ describe("analyzeChart", () => {
     const hammer = facts.setups.find((s) => s.name === "Hammer");
     expect(hammer).toBeDefined();
     expect(hammer!.context.priorTrend20).toBe("down");
-    expect(hammer!.context.ema20).not.toBeNull();
+    expect(hammer!.context.atr14).not.toBeNull();
+    expect(facts.isSynthetic).toBe(true);
     expect(hammer!.context.rsi14).not.toBeNull();
     expect(hammer!.context.volumeVsAvg20).toBeGreaterThan(1);
     expect(hammer!.keyLevels.invalidation).toBe(98.2);
